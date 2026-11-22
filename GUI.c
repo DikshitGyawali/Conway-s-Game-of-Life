@@ -8,6 +8,7 @@
 
 int main(){
     printf("SDL2 started\n");
+    int return_value = 0;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0){
         printf("SDL initialization failed: %s\n", SDL_GetError());
@@ -25,13 +26,22 @@ int main(){
 
     if (window == NULL){
         printf("Window creation failed: %s\n", SDL_GetError());
-        SDL_Quit();
-        return -1;
+        return_value = -1;
+        goto clean_up;
+    }
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (renderer == NULL){
+        printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
+        return_value = -1;
+        goto clean_up;
     }
 
-    SDL_Surface *screenSurface = SDL_GetWindowSurface(window);
-    SDL_FillRect(screenSurface, NULL, SDL_MapRGB(screenSurface->format, 0xFF, 0xFF, 0xFF));
-    SDL_UpdateWindowSurface(window);
+    SDL_Rect cell = {SCREEN_WIDTH / 4, SCREEN_HEIGHT / 4, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2};
+    SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+    SDL_RenderFillRect(renderer, &cell);
+    
+    SDL_RenderPresent(renderer);
+
 
     SDL_Event e;
     bool quit = false;
@@ -40,8 +50,9 @@ int main(){
     }
 
 
-    SDL_DestroyWindow(window);
+clean_up:
+    if (window != NULL) SDL_DestroyWindow(window);
+    if (renderer != NULL) SDL_DestroyRenderer(renderer);
     SDL_Quit();
-
-    return 0;
+    return return_value;
 }
