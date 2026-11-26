@@ -17,7 +17,7 @@ void update_textbox_render(SDL_Renderer *renderer, TextBox *text_box){
     }
 
     
-    if (text_box->focused){ r = 0; g = 255; b = 0; a = 255; }
+    if (text_box->focused && text_box->enabled){ r = 0; g = 255; b = 0; a = 255; }
     else { r = 140; g = 140; b = 140; a = 255;}
 
     if (SDL_SetRenderDrawColor(renderer, r, g, b, a) < 0 ||
@@ -29,7 +29,9 @@ void update_textbox_render(SDL_Renderer *renderer, TextBox *text_box){
     if (text_box->text[0] == '\0') return;
 
     //text
-    SDL_Surface *s = TTF_RenderUTF8_Blended(text_box->font, text_box->text, (SDL_Color){0, 0, 0, 255});  // text becomes pixels
+    r = 0; g = 0; b = 0; a = 255;
+    if(!text_box->enabled) { r = 164; g = 168; b = 175, a = 255; }
+    SDL_Surface *s = TTF_RenderUTF8_Blended(text_box->font, text_box->text, (SDL_Color){r, g, b, a});  // text becomes pixels
     if (s == NULL)  {
         printf("Text rendering failed: %s\n", TTF_GetError());
         return;
@@ -181,12 +183,12 @@ void update_button_input(Button *button, SDL_Event *e){
     if (e->type == SDL_MOUSEBUTTONUP && e->button.button == SDL_BUTTON_LEFT){
         SDL_Point p = { e->button.x, e->button.y };
         bool inside = SDL_PointInRect(&p, &button->rect);
-        if (button->on_click != NULL && button->pressed && inside) button->on_click(button->user_data);
+        if (button->on_click != NULL && button->pressed && inside) button->on_click(button , button->user_data);
         button->pressed = false;
     }
 }
 
-Button *create_button(SDL_Rect *box, TTF_Font *f, const char *label, void (*on_click)(void *), void *user_data){
+Button *create_button(SDL_Rect *box, TTF_Font *f, const char *label, void (*on_click)(Button *,void *), void *user_data){
     Button *button = (Button *)malloc(sizeof(Button));
     if (button == NULL) return NULL;
 
@@ -204,4 +206,39 @@ Button *create_button(SDL_Rect *box, TTF_Font *f, const char *label, void (*on_c
     SDL_StartTextInput();
 
     return button;
+}
+
+
+void update_text_render(SDL_Renderer *renderer, Text *text){
+    SDL_Surface *s = TTF_RenderUTF8_Blended(text->font, text->text, text->color);
+    if (s == NULL){
+        printf("Text rendering failed: %s\n", TTF_GetError());
+        return;
+    }
+    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+    if (t == NULL){
+        printf("Text rendering failed: %s\n", SDL_GetError());
+        return;
+    }
+    const SDL_Rect rect = {text->rect.x, text->rect.y, s->w, s->h};
+
+    if (SDL_RenderCopy(renderer, t, NULL, &rect) < 0){
+        printf("SLD_rendercopy failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    SDL_DestroyTexture(t);
+    SDL_FreeSurface(s);
+}
+
+Text *create_text(SDL_Rect *box, TTF_Font *f, const char *string, SDL_Color *color){
+    Text *text = (Text *)malloc(sizeof(Text));
+    if (text == NULL) return NULL;
+
+    text->rect = *box;
+    text->color = *color;
+    text->font = f;
+    snprintf(text->text, sizeof text->text, "%s", string);
+    text->render_update = update_text_render;
+    return text;
 }

@@ -79,7 +79,7 @@ bool grid_resize(Grid **g, int cols, int rows){
 
     for (int i = 0; i < low_rows; ++i){
         for (int j = 0; j < low_cols; ++j){
-            new_grid->cells[i * low_cols + j] = (*g)->cells[i * low_cols + j];
+            new_grid->cells[i * cols + j] = (*g)->cells[i * (*g)->cols + j];
         }
     }
     free((*g)->cells);

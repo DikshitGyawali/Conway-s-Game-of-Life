@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include "gol.h"
 #include "game_ui.h"
+#include "history.h"
 
 void update_game_canvas(SDL_Renderer *renderer, Game *game){
     SDL_Rect full = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
@@ -42,11 +43,14 @@ void mouse_update(Game *game){
 
 Game *game_init(int cols, int rows){
     Game *game = (Game *)malloc(sizeof(Game));
-    game->iterations = 0;
+    if (game == NULL) { printf("allocation failed for Game data\n"); return NULL; }
+    game->history = history_init(1000, cols, rows);
+    if (game->history == NULL) { printf("allocation failed for Game data\n");free(game); return NULL; }
     game->now = grid_create(cols, rows);
     game->next = grid_create(cols, rows);
     game->mode = MODE_EDIT;
     game->delay_ms = 200;
+    game->last_step = SDL_GetTicks();
     game->wrap = false;
 
     grid_clear(game->now);
@@ -58,42 +62,83 @@ Game *game_init(int cols, int rows){
     return game;
 }
 
+void game_resize(Game *game, int cols, int rows){
+    grid_resize(&game->now, cols, rows);
+    grid_resize(&game->next, cols, rows);
+    game->history = history_resize(game->history, cols, rows);
+}
+
 void game_end(Game *game){
     grid_free(game->now);
     grid_free(game->next);
+    history_free(game->history);
     free(game);
 }
 
 
-void play_pause(void *game){ // play_pause_btn
+void play_pause(Button *this, void *game){ // play_pause_btn
     Game *gol = (Game *)game;
-    if (gol->mode == MODE_RUN) gol->mode = MODE_PAUSED;
-    else if (gol->mode == MODE_PAUSED) gol->mode = MODE_RUN;
+    static Button *play_pause_btn;
+    if (this != NULL) play_pause_btn = this;
+    else this = play_pause_btn;
+
+    if (gol->mode == MODE_RUN){
+        gol->mode = MODE_PAUSED;
+    }
+    else if (gol->mode == MODE_PAUSED || gol->mode == MODE_EDIT) {
+        gol->mode = MODE_RUN;
+    }
+    gol->last_step = SDL_GetTicks();
 }
 
-void next_step(void *game){ // next_step_btn
+void next_step(Button *this, void *game){ // next_step_btn
+    (void)this;
     Game *gol = (Game *)game;
     if (gol->mode == MODE_EDIT){
         gol->mode = MODE_PAUSED;
-        
     }
-    grid_step(gol->now, gol->next, false);
+    history_push(gol->history, gol->now);
+    grid_step(gol->now, gol->next, gol->wrap);
     Grid *temp = gol->now;
     gol->now = gol->next;
     gol->next = temp;
 }
 
-void stop(void *game){ // stop_btn
+void back_step(Button *this, void *game){ // back_step_btn
+    (void)this;
+    Game *gol = (Game *)game;
+    if (gol->mode == MODE_EDIT || 
+        gol->mode == MODE_RUN || 
+       (gol->mode == MODE_PAUSED && gol->history->count == 0)) return;
+    history_pop(gol->history, gol->now);
+}
+
+void stop(Button *this, void *game){ // stop_btn
+    (void)this;
     Game *gol = (Game *)game;
 
     if (gol->mode == MODE_RUN || gol->mode == MODE_PAUSED){
-        grid_clear(gol->now); // temp history will be added
         gol->mode = MODE_EDIT;
+        memcpy(gol->now->cells, gol->history->data, gol->history->cell_count);
+        history_clear(gol->history);
     }
 }
 
-void clear_canvas(void *game){ // clear_btn
+void clear_canvas(Button *this, void *game){ // clear_btn
+    (void)this;
     Game *gol = (Game *)game;
     grid_clear(gol->now);
 }
 
+void wrap(Button *this, void *game){ // wrap_btn
+    Game *gol = (Game *)game;
+    if (gol->wrap) {
+        gol->wrap = false;
+        snprintf(this->label, sizeof this->label, "%s", "Wrap edges: off");
+    }
+    else{
+        gol->wrap = true;
+        snprintf(this->label, sizeof this->label, "%s", "Wrap edges: on");
+    }
+    history_clear(gol->history);
+}

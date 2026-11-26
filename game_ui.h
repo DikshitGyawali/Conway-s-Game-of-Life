@@ -3,6 +3,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "gol.h"
+#include "menu_ui.h"
+#include "history.h"
 
 typedef enum{
     MODE_EDIT,
@@ -14,8 +16,9 @@ typedef struct{
     Grid *now;
     Grid *next;
     Mode mode;
-    int iterations;
-    int delay_ms;
+    History *history;
+    Uint32 delay_ms;
+    Uint32 last_step;
     bool wrap;
 } Game;
 
@@ -26,12 +29,15 @@ extern TTF_Font *font;
 
 
 Game *game_init(int cols, int rows);
+void game_resize(Game *game, int cols, int rows);
 void game_end(Game *game);
 
-void play_pause(void *game);
-void next_step(void *game);
-void stop(void *game);
-void clear_canvas(void *game);
+void play_pause(Button *this, void *game);
+void next_step(Button *this, void *game);
+void back_step(Button *this, void *game);
+void stop(Button *this, void *game);
+void clear_canvas(Button *this, void *game);
+void wrap(Button *this, void *game);
 
 void update_game_canvas(SDL_Renderer *renderer, Game *game);
 void mouse_update(Game *game);
